@@ -144,6 +144,9 @@ def domain_days_left():
 
 # ---------------------------------------------------------------- почта
 def send_email(subject, text, dry_run=False):
+    text += ("\n\n—\nЭто автоматическое письмо от системы мониторинга сайта "
+             f"{DOMAIN}. Отвечать на него не нужно.\n"
+             "Журнал проверок: https://github.com/rifatism/septik-monitor/actions")
     if dry_run:
         print(f"\n[DRY RUN] письмо: {subject}\n{text}\n")
         return
@@ -157,6 +160,7 @@ def send_email(subject, text, dry_run=False):
     msg["Subject"] = subject
     msg["From"] = f"Мониторинг {DOMAIN} <{user}>"
     msg["To"] = ", ".join(to)
+    msg["Auto-Submitted"] = "auto-generated"  # RFC 3834: автоответчики не будут отвечать
     msg.set_content(text)
 
     if port == 465:

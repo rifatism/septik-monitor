@@ -1,0 +1,50 @@
+name: Мониторинг septik-tmn.ru
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # каждые 5 минут (GitHub иногда запускает с опозданием на 5-15 мин)
+  workflow_dispatch:
+    inputs:
+      test_email:
+        description: "Отправить тестовое письмо"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # чтобы сохранять state.json между запусками
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_TO: ${{ secrets.MAIL_TO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Тестовое письмо
+        if: ${{ inputs.test_email }}
+        run: python3 monitor.py --test-email
+
+      - name: Проверка сайта
+        if: ${{ !inputs.test_email }}
+        run: python3 monitor.py
+
+      - name: Сохранить состояние
+        if: ${{ !inputs.test_email }}
+        run: |
+          git add state.json
+          git diff --cached --quiet && exit 0
+          git config user.name "uptime-bot"
+          git config user.email "uptime-bot@users.noreply.github.com"
+          git commit -m "state: $(python3 -c 'import json;print(json.load(open("state.json"))["status"])')"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          exit 1
